@@ -1,0 +1,18 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+# caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+# weights & outputs
+weights/*.pt
+weights/*.onnx
+*.webm
+*.mp4
+!sample.mp4
+# os
+.DS_Store

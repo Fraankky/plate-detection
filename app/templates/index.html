@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plate — Detection</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#FCFCFB;--surface:#fff;--line:#E4E4E7;--text:#09090B;--muted:#71717A;--accent:#0E9F6E;--radius:16px;--mono:"Geist Mono",monospace;--sans:"Geist",sans-serif}
+  *{box-sizing:border-box} body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px}
+  .health{border:1px solid var(--line);border-radius:999px;padding:6px 12px;display:inline-flex;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted);background:#fff}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .section{margin-top:20px;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);overflow:hidden}
+  .section-head{padding:16px 16px 0;display:flex;justify-content:space-between;gap:16px;align-items:baseline}
+  .section-head h3{margin:0;font-size:15px}
+  .section-head h3 span{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-right:6px}
+  .section-head p{margin:0;color:var(--muted);font-size:12px}
+  .divider{height:1px;background:var(--line);margin:12px 16px 0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}
+  .video-grid{grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr)}
+  .video-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .video-pair .preview{aspect-ratio:16/9;min-height:240px}
+  @media(max-width:800px){.grid,.video-grid{grid-template-columns:1fr}.video-pair{grid-template-columns:1fr}.video-pair .preview{min-height:0}}
+  .upload{border:1px dashed #D4D4D8;background:var(--bg);border-radius:12px;padding:12px;display:grid;gap:8px}
+  .upload label{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+  input[type=file]{width:100%;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
+  input[type=file]::file-selector-button{border:0;background:var(--text);color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;margin-right:10px;cursor:pointer}
+  .preview{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0A0A0A;aspect-ratio:1.2;display:grid;place-items:center}
+  .preview canvas,.preview img,.preview video{width:100%;height:100%;object-fit:contain;display:block}
+  .preview-empty{color:#fff;font-family:var(--mono);font-size:11px;opacity:0.6;text-align:center;padding:16px}
+  .btn{border:1px solid var(--text);background:var(--text);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:0.5}
+  .hint{font-size:12px;color:var(--muted)}
+  .mono{font-family:var(--mono)}
+  pre{margin:0;padding:12px;font-family:var(--mono);font-size:11px;line-height:1.5;max-height:300px;overflow:auto;background:var(--bg);white-space:pre-wrap;word-break:break-word}
+  .result{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg);min-height:200px}
+  .result-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--muted);background:#fff}
+  .error{display:none;color:#9F1239;background:#FFF1F2;border:1px solid #FECDD3;padding:10px;border-radius:10px;font-size:12px;margin-top:10px}
+  footer{max-width:1180px;margin:0 auto;padding:16px 20px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 style="font-size:22px;margin:0 0 6px;letter-spacing:-0.02em">Plate Detection — <span style="font-family:Fraunces;font-style:italic;font-weight:600">single object</span></h1>
+  <p style="margin:0 0 12px;color:var(--muted);font-size:13px">Upload foto (JPG/PNG) atau video (MP4) — preview dengan bounding box plat.</p>
+  <div id="health" class="health">checking…</div>
+
+  <!-- FOTO -->
+  <section class="section">
+    <div class="section-head"><h3><span>01</span> Foto</h3><p>POST /detect — JSON + bbox di canvas</p></div>
+    <div class="divider"></div>
+    <div class="grid video-grid">
+      <div>
+        <div class="upload">
+          <label for="imgFile">Pilih foto</label>
+          <input id="imgFile" type="file" accept="image/*">
+        </div>
+        <div class="preview" style="margin-top:12px">
+          <div id="imgEmpty" class="preview-empty">Belum ada foto</div>
+          <img id="imgPreview" style="display:none" alt="preview">
+          <canvas id="imgCanvas" width="640" height="640" style="display:none"></canvas>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+          <button id="btnImg" class="btn">Deteksi foto</button>
+          <span id="imgMeta" class="hint mono">—</span>
+        </div>
+      </div>
+      <div class="result">
+        <div class="result-head"><span>Response</span><span class="mono">JSON</span></div>
+        <pre id="imgResult">Belum ada hasil.</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIDEO -->
+  <section class="section">
+    <div class="section-head"><h3><span>02</span> Video</h3><p>POST /video — upload video → preview MP4 dengan bbox</p></div>
+    <div class="divider"></div>
+    <div class="grid">
+      <div style="display:grid;gap:10px">
+        <div class="upload">
+          <label for="vidFile">Pilih video</label>
+          <input id="vidFile" type="file" accept="video/*">
+        </div>
+        <button id="btnVid" class="btn">Upload &amp; preview</button>
+        <span id="vidStatus" class="hint mono"></span>
+        <div class="video-pair">
+          <div>
+            <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:6px">ORIGINAL</div>
+            <div class="preview" style="aspect-ratio:16/9">
+              <video id="vidPreview" controls muted playsinline style="display:none"></video>
+              <div id="vidPreviewEmpty" class="preview-empty">Belum ada video</div>
+            </div>
+          </div>
+          <div>
+            <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:6px">ANNOTATED (bbox)</div>
+            <div class="preview" style="aspect-ratio:16/9">
+              <video id="vidAnnotated" controls muted playsinline loop style="display:none"></video>
+              <div id="vidAnnotatedEmpty" class="preview-empty">Preview setelah upload</div>
+            </div>
+            <div style="margin-top:8px"><a id="vidDownload" href="/health" download="annotated.mp4" class="hint" style="display:none;text-decoration:underline">Download MP4</a> <span id="vidInfo" class="hint mono"></span></div>
+          </div>
+        </div>
+        <div id="vidError" class="error"></div>
+      </div>
+      <div class="result" style="display:flex;flex-direction:column;justify-content:center;align-items:center;padding:16px;color:var(--muted);font-size:13px;text-align:center">
+        Video preview akan muncul di sebelah. Bbox hijau mengikuti plat dari model YOLO di <code>weights/best.pt</code>.
+        <br><br>
+        <span class="mono" style="font-size:11px">Endpoints: <a href="/docs">/docs</a> · <a href="/health">/health</a></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer><span class="mono">YOLOv8n · single-object</span><span><a href="/docs">docs</a> · <a href="/health">health</a></span></footer>
+
+<script>
+async function health(){
+  const el=document.getElementById('health');
+  try{
+    const r=await fetch('/health'); const j=await r.json();
+    el.innerHTML='<span class="dot"></span> <b>'+j.status+'</b> · <span class="mono">'+j.model+'</span>';
+  }catch(e){ el.textContent='health error: '+e; el.style.color='#9F1239';}
+}
+health();
+
+// FOTO
+const imgFile=document.getElementById('imgFile');
+const imgPreview=document.getElementById('imgPreview');
+const imgCanvas=document.getElementById('imgCanvas');
+const imgCtx=imgCanvas.getContext('2d');
+const imgResult=document.getElementById('imgResult');
+const imgEmpty=document.getElementById('imgEmpty');
+const imgMeta=document.getElementById('imgMeta');
+let imgUrl=null;
+imgFile.onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  if(imgUrl) URL.revokeObjectURL(imgUrl);
+  imgUrl=URL.createObjectURL(f);
+  imgPreview.src=imgUrl; imgPreview.style.display='block'; imgEmpty.style.display='none'; imgCanvas.style.display='none';
+  imgPreview.onload=()=>{ imgMeta.textContent=f.name+' · '+imgPreview.naturalWidth+'×'+imgPreview.naturalHeight; };
+  imgResult.textContent='Siap — klik Deteksi foto.';
+};
+document.getElementById('btnImg').onclick=async()=>{
+  const f=imgFile.files[0]; if(!f){ alert('Pilih foto dulu'); return; }
+  const fd=new FormData(); fd.append('file',f);
+  imgResult.textContent='Detecting…';
+  try{
+    const r=await fetch('/detect',{method:'POST',body:fd});
+    const t=await r.text(); let j; try{ j=JSON.parse(t);}catch{ throw new Error(t.slice(0,500));}
+    if(!r.ok) throw new Error(j.detail||t.slice(0,500));
+    imgResult.textContent=JSON.stringify(j,null,2);
+    const img=new Image(); const url=URL.createObjectURL(f);
+    await new Promise(res=>{ img.onload=res; img.onerror=res; img.src=url; });
+    imgCanvas.style.display='block'; imgPreview.style.display='none'; imgEmpty.style.display='none';
+    imgCanvas.width=img.naturalWidth||640; imgCanvas.height=img.naturalHeight||640;
+    imgCtx.drawImage(img,0,0,imgCanvas.width,imgCanvas.height);
+    if(j.detections?.length){
+      imgCtx.strokeStyle='#0E9F6E'; imgCtx.lineWidth=Math.max(2,imgCanvas.width/320); imgCtx.font=Math.max(12,imgCanvas.width/42)+'px Geist, sans-serif';
+      j.detections.forEach(d=>{
+        const [x1,y1,x2,y2]=d.bbox;
+        imgCtx.strokeRect(x1,y1,x2-x1,y2-y1);
+        const label=d.class+' '+(d.confidence*100).toFixed(1)+'%';
+        const pad=6; const tw=imgCtx.measureText(label).width+pad*2;
+        imgCtx.fillStyle='#0E9F6E'; imgCtx.fillRect(x1,Math.max(0,y1-16),tw,16);
+        imgCtx.fillStyle='#fff'; imgCtx.fillText(label,x1+pad,Math.max(12,y1-5));
+      });
+      imgMeta.textContent=j.count+' detections · '+imgCanvas.width+'×'+imgCanvas.height;
+    } else imgMeta.textContent='0 detections';
+    URL.revokeObjectURL(url);
+  }catch(err){ imgResult.textContent='Error: '+err.message; }
+};
+
+// VIDEO
+const vidFile=document.getElementById('vidFile');
+const vidPreview=document.getElementById('vidPreview');
+const vidPreviewEmpty=document.getElementById('vidPreviewEmpty');
+const vidAnnotated=document.getElementById('vidAnnotated');
+const vidAnnotatedEmpty=document.getElementById('vidAnnotatedEmpty');
+const vidStatus=document.getElementById('vidStatus');
+const vidError=document.getElementById('vidError');
+vidFile.onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const url=URL.createObjectURL(f);
+  vidPreview.src=url; vidPreview.style.display='block'; vidPreviewEmpty.style.display='none';
+  vidAnnotated.style.display='none'; vidAnnotatedEmpty.style.display='block'; vidAnnotated.src='';
+  vidStatus.textContent=f.name+' · '+(f.size/1024).toFixed(0)+' KB';
+  vidError.style.display='none';
+  document.getElementById('vidDownload').style.display='none';
+  document.getElementById('vidInfo').textContent='';
+};
+document.getElementById('btnVid').onclick=async()=>{
+  const f=vidFile.files[0]; if(!f){ alert('Pilih video MP4 dulu'); return; }
+  const dl=document.getElementById('vidDownload');
+  const info=document.getElementById('vidInfo');
+  vidError.style.display='none'; dl.style.display='none'; info.textContent='';
+  try{
+    if(f.size===0) throw new Error('File kosong');
+    const previewUrl=URL.createObjectURL(f); vidPreview.src=previewUrl; vidPreview.style.display='block'; vidPreviewEmpty.style.display='none';
+    vidStatus.textContent='Uploading…';
+    const fd=new FormData(); fd.append('file',f);
+    const r=await fetch('/video',{method:'POST',body:fd});
+    if(!r.ok){ const t=await r.text(); throw new Error('/video '+r.status+': '+t.slice(0,500)); }
+    const blob=await r.blob();
+    if(blob.size<500){ const t=await blob.text(); throw new Error('preview kecil: '+t.slice(0,500)); }
+    if(vidAnnotated.src) try{ URL.revokeObjectURL(vidAnnotated.src);}catch(e){}
+    const url=URL.createObjectURL(blob);
+    vidAnnotated.src=url; dl.href=url; dl.download='annotated_'+(f.name.replace(/\.[^/.]+$/,'')||'video')+'.mp4'; dl.style.display='inline';
+    vidAnnotated.style.display='block'; vidAnnotatedEmpty.style.display='none'; vidAnnotated.load();
+    vidAnnotated.onloadedmetadata=()=>{ info.textContent=vidAnnotated.videoWidth+'×'+vidAnnotated.videoHeight+' · '+vidAnnotated.duration.toFixed(1)+'s'; };
+    vidAnnotated.oncanplay=()=>{ vidAnnotated.play().catch(()=>{ vidError.textContent='Autoplay blocked — klik video untuk play.'; vidError.style.display='block'; }); };
+    vidAnnotated.onerror=()=>{ const e=vidAnnotated.error; vidError.textContent='Video error: '+(e?e.code:'unknown'); vidError.style.display='block'; };
+    vidStatus.textContent='Preview ready ('+(blob.size/1024).toFixed(1)+' KB)';
+  }catch(err){
+    vidStatus.textContent='Error: '+err.message;
+    vidError.textContent=err.message; vidError.style.display='block';
+  }
+};
+</script>
+</body>
+</html>
