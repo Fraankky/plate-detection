@@ -1,5 +1,7 @@
 # Single Object Detection
 
+![Simulasi object detection](simulasi_object_detection.png)
+
 Simulasi implementasi single-object detection menggunakan YOLO untuk mendeteksi lokasi plat nomor kendaraan pada gambar dan video.
 
 Project ini menyediakan:
