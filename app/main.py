@@ -136,6 +136,7 @@ async def video(file: UploadFile = File(..., description="MP4")):
     out_path = Path(out_path_s)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type: ignore[attr-defined]
     out = cv2.VideoWriter(str(out_path), fourcc, fps if fps > 0 else 5.0, (w, h))
+    
     if not out.isOpened():
         cap.release()
         _unlink(in_path)
